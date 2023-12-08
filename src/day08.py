@@ -1,3 +1,4 @@
+import math
 from myModules.inputParser import parseWithFunction  #type: ignore
 
 
@@ -35,7 +36,6 @@ def _listOps1(alist):
   turns = 0
   position = 'AAA'
 
-  print(network)
   while position != 'ZZZ':
     if instructions[turns % len(instructions)] == 'L':
       #print("At {}, turn {}".format(position, "left"))
@@ -52,42 +52,40 @@ def _listOps1(alist):
 def _listOps2(alist):
   [documents] = alist
   [instructions, network] = documents
-  turns = 0
-  positions = []
+  positions = {}
   for p in network:
-    print(p[2])
     if p[2] == 'A':
-      positions.append(p)
-  print(positions)
+      positions.update({p : {}})
 
-  cont = True
-  
-  while cont:
-    if instructions[turns % len(instructions)] == 'L':
-      for i in range(0, len(positions)):
-        #print("At {}, turn {}".format(positions[i], "left"))
-        positions[i] = network[positions[i]][0]
-    else:
-      for i in range(0, len(positions)):
-        #print("At {}, turn {}".format(positions[i], "right"))
-        positions[i] = network[positions[i]][1]
-        
-    cont = False
-    #print("Check end condition")
-    for p in positions:
-      #print(p)
-      if p[2] != 'Z':
-        cont = True
-        break
-        
-    turns += 1
+  for pos in positions:
+    p = pos
+    turns = 0
+    while p[2] != 'Z':
 
-  return turns
+      if instructions[turns % len(instructions)] == 'L':
+          #print("At {}, turn {}".format(positions[i], "left"))
+          p = network[p][0]
+      else:
+          #print("At {}, turn {}".format(positions[i], "right"))
+          p = network[p][1]
+      
+      turns += 1
+
+    positions[pos].update({p : turns})
+
+  #apperently there is only one loop (fixed length) of each path
+  #this means we can use lowest common multiple
+  lcm = 1
+  for p in positions:
+    for turns in positions[p]:
+      lcm = math.lcm(lcm, positions[p][turns])
+
+  return lcm
 
 
 if __name__ == "__main__":
   func = _stringParsing
   parsed_input = parseWithFunction(func)
-  print(parsed_input)
+  #print(parsed_input)
   print("Part 1: ", _listOps1(parsed_input))
   print("Part 2: ", _listOps2(parsed_input))
