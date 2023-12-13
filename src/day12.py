@@ -1,4 +1,3 @@
-import math
 from myModules.inputParser import parseWithFunction  #type: ignore
 
 # Build data structure (as a list)
@@ -7,101 +6,76 @@ def _stringParsing(str):
   data = [int(x) for x in data.split(',')]
   return [springs, data]
 
-def _permutate(pruned_list):
+# Entry point for the exhaustive search for feasible permutations
+def _exSearchEntry(pruned_list):
   [springs, data] = pruned_list
-  sum_data = sum(data)
-  sum_assigned = springs.count('#')
-  springs = list(springs)
-  spring_value = sum(data)
-  permutations = 0
-
-  def backtrack(index):
-    nonlocal permutations
-    nonlocal sum_assigned
-    nonlocal sum_data
-    if (sum_assigned + (len(springs)-index) < sum_data):
-      return
-    elif index == len(springs):
-      # All unknown springs are filled, check if the arrangement is valid
-      if (sum_assigned != sum_data):
-        return
-      elif _feasibleRow(springs, data):
-        permutations += 1
-        return
-      else:
-        return 
-    elif springs[index] == '?':
-      springs[index] = '#'
-      sum_assigned += 1
-      backtrack(index + 1)
-
-      springs[index] = '.'
-      sum_assigned -= 1
-      backtrack(index + 1)
-
-      springs[index] = '?'
+  (count,_) = _exSearch(list(springs), data, {}, 0)
+  return count
+  
+# Recursive function for exhaustive search
+def _exSearch(springs, data, map, count):
+  # Basecase 1, out of values to assign
+  if not data:
+    if '#' not in springs:
+      return (1, map)
     else:
-      backtrack(index + 1)
+      return (0, map)
+  # Basecase 2, out elements in the list
+  if not springs:
+    if not data:
+      return (1, map)
+    else:
+      return (0, map)
 
-  backtrack(0)
-  return permutations
-def _feasibleRow(row, data):
-  j = 0
-  i = 0
-  sum_data = 0
-  while i < len(data):
-    x = data[i]
-    y = 0
-    while j < len(row):
-      if row[j] == '#':
-        y += 1
-      elif y > 0 and y != x:
-        #print("N02 - Feasible {} is {}".format(row, False))
-        return False
-      elif x == y:
-        break
-      if y > x:
-        #print("N01 - Feasible {} is {}".format(row, False))
-        return False
+  # Found in chache
+  if (tuple(springs), tuple(data)) in map:
+    return (map[(tuple(springs), tuple(data))], map)
+
+  next_spring = springs[0]
+  next_value = data[0]
+  # Basecase 3, cannot fill the next value
+  if next_value > len(springs):
+    return (0, map)
+
+  # Continue to next spring
+  if next_spring == '.':
+    return _exSearch(springs[1:], data, map, count)
+  elif next_spring == '#':
+    if '.' in springs[:next_value]:
+      return (0, map)
+    else:
+      if next_value == len(springs):
+        return _exSearch(springs[next_value+1:], data[1:], map, count)
+      elif springs[next_value] == '#':
+        return (0, map)
       else:
-        j += 1
-    
-    i += 1
-    if x == y:
-      sum_data += x
-
-  if sum_data != sum(data):
-    #print("N03 - Feasible {} is {}".format(row, False))
-    return False
-  elif j < len(row) and '#' in row[j:]:
-    #print("N04 - Feasible {} is {}".format(row, False))
-    return False
+        return _exSearch(springs[next_value+1:], data[1:], map, count)
   else:
-    #print("YYY - Feasible {} is {}".format(row, True))
-    return True
+    # next_spring == '?'
+    # Recursive cases
+    springs[0] = '#'
+    (c1, map) = _exSearch(springs, data, map, 0)
+    map.update({(tuple(springs), tuple(data)) : c1})
+
+    springs[0] = '.'
+    (c2, map) = _exSearch(springs, data, map, 0)
+    map.update({(tuple(springs), tuple(data)) : c2})
+
+    return (count+c1+c2, map)
 
 # Part 1
 def _listOps1(alist):
-
-  total = sum(_permutate(springs) for springs in alist)
+  total = sum(_exSearchEntry(springs) for springs in alist)
   return total
-
-# TODO: Work out the logic in part 2, current not working
-def _unfold_and_count(springs_list):
-    [springs, data] = springs_list
-    
-    count = _permutate([springs, data])
-    
-    unfolded_springs = springs + '?'  # Unfold the arrangement once
-    
-    # Multiply by the count of arrangements for each unfolded arrangement
-    count *= _permutate([unfolded_springs, data]) ** 4
-    
-    return count
 
 # Part 2
 def _listOps2(alist):
-  total = sum(_unfold_and_count(springs) for springs in alist)
+  total = 0
+  for item in alist:
+    [springs, data] = item
+    unfolded_springs = springs + (('?' + springs) * 4)
+    unfolded_data = data * 5
+    total += _exSearchEntry([unfolded_springs, unfolded_data])
 
   return total
 
