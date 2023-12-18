@@ -4,72 +4,76 @@ import time
 import heapq
 from myModules.inputParser import parseWithFunction  #type: ignore
 
+
 # Build data structure (as a list)
 def _stringParsing(str):
   return [int(x) for x in list(str)]
 
-#TODO: need better pq
-def _shortestPath(city_blocks, start, stop):
-  heat_map = [[0 for _ in range(len(city_blocks[0]))] for _ in range(len(city_blocks))]
-  pos_map = [[[] for _ in range(len(city_blocks[0]))] for _ in range(len(city_blocks))]
-  for row in heat_map:
-    print(*row)
-  block = [start, (1,0), 0]
-  pq = [block]
-  def _in_range(p,l):
-    return 0 <= p[0] < l and 0 <= p[1] < l 
 
-  def _check_block_not_visited(p0, p):
-    acc_heat = heat_map[p0[0]][p0[1]]
-    heat = city_blocks[p[0]][p[1]]
-    if heat_map[p[0]][p[1]] == 0:
-      heat_map[p[0]][p[1]] = acc_heat + heat
-      pos_map[p[0]][p[1]] = p0
+def _shortestPath(city_blocks, _):
+  heat_map = [[-1 for _ in range(len(city_blocks[0]))]
+              for _ in range(len(city_blocks))]
+  pos_map = [[(-1, -1) for _ in range(len(city_blocks[0]))]
+             for _ in range(len(city_blocks))]
 
-    elif heat_map[p[0]][p[1]] > acc_heat + heat:
-      heat_map[p[0]][p[1]] = acc_heat + heat
-      pos_map[p[0]][p[1]] = p0
-    else:
-      return False
-    return True
+  heat_map[0][0] = 0
+  pos_map[0][0] = (0, 0)
+  pos_map[1][0] = (0, 0)
+  pos_map[0][1] = (0, 0)
+  block_straight = [city_blocks[0][1], [(0, 1), (0, 1), 1]]
+  block_down = [city_blocks[1][0], [(1, 0), (1, 0), 1]]
+  pq = []
+  heapq.heappush(pq, block_straight)
+  heapq.heappush(pq, block_down)
+
+  # Movement directions
+  directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+  def _in_range(psn, lgh):
+    return 0 <= psn[0] < lgh and 0 <= psn[1] < lgh
+
+  def _getHeat(psn, city_blocks):
+    return city_blocks[psn[0]][psn[1]]
 
   while pq:
-    [position, direction, steps] = pq.pop(0)
+    [heat, info] = heapq.heappop(pq)
+    position, direction, steps = info
+    print("Checking ({},{}) with current heat {}".format(
+        position[0], position[1], heat))
+    for row in heat_map:
+      print(*row)
 
-    blocks = []
-    #left
-    left_direction = (direction[1], direction[0])
-    left_position = (position[0]+left_direction[0], position[1]+left_direction[1])
-    if _in_range(left_position, len(city_blocks)):
-      # operations
-      if _check_block_not_visited(position,left_position):
-        blocks.append([left_position, left_direction, 1])
+    if (heat_map[position[0]][position[1]] != -1):
+      continue
+    
+    heat_map[position[0]][position[1]] = heat
 
-    #right
-    right_direction = (0-direction[1], 0-direction[0])
-    right_position = (position[0]+right_direction[0], position[1]+right_direction[1])
-    if _in_range(right_position, len(city_blocks)):
-      # operations
-      if _check_block_not_visited(position,right_position):
-        blocks.append([right_position, right_direction, 1])
+    if steps < 3:
+      new_position = (position[0] + direction[0], position[1] + direction[1])
+      if _in_range(new_position, len(city_blocks)):
+        pos_map[new_position[0]][new_position[1]] = position
+        new_heat = heat + _getHeat(new_position, city_blocks)
+        block = [new_heat, [new_position, direction, steps + 1]]
+        heapq.heappush(pq, block)
 
-    if not steps == 3:
-      #straight
-      forward_position = (position[0]+direction[0], position[1]+direction[1])
-      if _in_range(forward_position, len(city_blocks)):
-        # operations
-        if _check_block_not_visited(position,forward_position):
-          blocks.append([forward_position, direction, steps+1])
-    # print(blocks)
-    pq.extend(blocks)
-    # print(pq)
+    for (dx, dy) in directions:
+      if (dx, dy) != direction and (dx, dy) != (-direction[0], -direction[1]):
+        print("dx dy", dx, dy, " direction ", direction)
+        new_position = (position[0] + dx, position[1] + dy)
+        if _in_range(new_position, len(city_blocks)):
+          pos_map[new_position[0]][new_position[1]] = position
+          new_direction = (dx, dy)
+          new_heat = heat + _getHeat(new_position, city_blocks)
+          block = [new_heat, [new_position, new_direction, 1]]
+          heapq.heappush(pq, block)
 
   #print outs
+  print("---" * 10, " search complete")
+  # for row in pos_map:
+  #   print(*row)
   # print_city = list(city_blocks)
-  # for row in print_city:
-  #   row = list(row)
-  # s = stop
-  # while s != (0,0):
+  # s = (12, 12)
+  # while s != (0, 0):
   #   print(s)
   #   print_city[s[0]][s[1]] = '*'
   #   s = pos_map[s[0]][s[1]]
@@ -77,15 +81,17 @@ def _shortestPath(city_blocks, start, stop):
 
   return heat_map
 
+
 # Part 1
 def _listOps1(city_blocks):
-  start = (0,0)
-  stop_y = len(city_blocks[0])-1
-  stop_x = len(city_blocks)-1
-  stop = (stop_y, stop_x)
+  start = (0, 0)
+  # stop_y = len(city_blocks[0])-1
+  # stop_x = len(city_blocks)-1
+  # stop = (stop_y, stop_x)
 
-  city_map = _shortestPath(city_blocks, start, stop)
+  city_map = _shortestPath(city_blocks, start)
 
+  print(">" * 10, "Heat Map", "<" * 10)
   for row in city_map:
     print(*row)
   for row in city_blocks:
@@ -134,5 +140,3 @@ import heapq
 
 # print("Original heap of objects:", my_objects)
 # print("Smallest object popped:", smallest_object)
-
- 
