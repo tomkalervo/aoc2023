@@ -9,134 +9,108 @@ from myModules.inputParser import parseWithFunction  #type: ignore
 def _stringParsing(str):
   return [int(x) for x in list(str)]
 
-
-def _shortestPath(city_blocks, _):
-  heat_map = [[-1 for _ in range(len(city_blocks[0]))]
-              for _ in range(len(city_blocks))]
-  pos_map = [[(-1, -1) for _ in range(len(city_blocks[0]))]
-             for _ in range(len(city_blocks))]
-
-  heat_map[0][0] = 0
-  pos_map[0][0] = (0, 0)
-  pos_map[1][0] = (0, 0)
-  pos_map[0][1] = (0, 0)
-  block_straight = [city_blocks[0][1], [(0, 1), (0, 1), 1]]
-  block_down = [city_blocks[1][0], [(1, 0), (1, 0), 1]]
+# used for part 1
+def _shortestPath(city_blocks):
+  visited = set()
+  block = [0,0,(0,0),(0,1)]
   pq = []
-  heapq.heappush(pq, block_straight)
-  heapq.heappush(pq, block_down)
+  heapq.heappush(pq, block)
 
-  # Movement directions
-  directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+  def _in_range(y,x, lgh):
+    return 0 <= y < lgh and 0 <= x < lgh
 
-  def _in_range(psn, lgh):
-    return 0 <= psn[0] < lgh and 0 <= psn[1] < lgh
-
-  def _getHeat(psn, city_blocks):
-    return city_blocks[psn[0]][psn[1]]
-
+  # Dijkstra algorithm with constraints
   while pq:
-    [heat, info] = heapq.heappop(pq)
-    position, direction, steps = info
-    print("Checking ({},{}) with current heat {}".format(
-        position[0], position[1], heat))
-    for row in heat_map:
-      print(*row)
-
-    if (heat_map[position[0]][position[1]] != -1):
-      continue
+    heat,steps,(y,x),(dy,dx) = heapq.heappop(pq)
+    # print("({},{}) = {}".format(y,x,heat))
     
-    heat_map[position[0]][position[1]] = heat
+    # We reached our goal
+    if (y,x) == (len(city_blocks)-1,len(city_blocks)-1):
+      return heat
+    
+    # Because of constraint max 3 steps in a row, 
+    # we need to store direction and steps
+    if (y,x,dy,dx,steps) in visited:
+      continue
+    visited.add((y,x,dy,dx,steps))
 
     if steps < 3:
-      new_position = (position[0] + direction[0], position[1] + direction[1])
-      if _in_range(new_position, len(city_blocks)):
-        pos_map[new_position[0]][new_position[1]] = position
-        new_heat = heat + _getHeat(new_position, city_blocks)
-        block = [new_heat, [new_position, direction, steps + 1]]
+      (new_y,new_x) = (y+dy,x+dx)
+      if _in_range(new_y,new_x,len(city_blocks)):
+        new_heat = heat + city_blocks[new_y][new_x]
+        block = [new_heat,steps+1,(new_y,new_x),(dy,dx)]
         heapq.heappush(pq, block)
 
-    for (dx, dy) in directions:
-      if (dx, dy) != direction and (dx, dy) != (-direction[0], -direction[1]):
-        print("dx dy", dx, dy, " direction ", direction)
-        new_position = (position[0] + dx, position[1] + dy)
-        if _in_range(new_position, len(city_blocks)):
-          pos_map[new_position[0]][new_position[1]] = position
-          new_direction = (dx, dy)
-          new_heat = heat + _getHeat(new_position, city_blocks)
-          block = [new_heat, [new_position, new_direction, 1]]
+    for (new_dy,new_dx) in [(-dx,dy),(dx,-dy)]:
+      (new_y,new_x) = (y+new_dy,x+new_dx)
+      if _in_range(new_y,new_x,len(city_blocks)):
+        new_heat = heat + city_blocks[new_y][new_x]
+        block = [new_heat,1,(new_y,new_x),(new_dy,new_dx)]
+        heapq.heappush(pq, block)
+
+  return -1
+
+# used for part 2
+def _shortestPathUltra(city_blocks):
+  visited = set()
+  block = [0,0,(0,0),(0,1)]
+  pq = []
+  heapq.heappush(pq, block)
+
+  def _in_range(y,x,l_y,l_x):
+    return 0 <= y < l_y and 0 <= x < l_x
+
+  # Dijkstra algorithm with constraints
+  while pq:
+    heat,steps,(y,x),(dy,dx) = heapq.heappop(pq)
+    
+    # We reached our goal, and are allowed to stop (minimum steps of 4)
+    if (y,x) == (len(city_blocks)-1,len(city_blocks[0])-1) and steps > 3:
+      return heat
+    
+    # Because of constraint max 3 steps in a row, 
+    # we need to store direction and steps
+    if (y,x,dy,dx,steps) in visited:
+      continue
+    visited.add((y,x,dy,dx,steps))
+    
+    if steps < 10:
+      (new_y,new_x) = (y+dy,x+dx)
+      if _in_range(new_y,new_x,len(city_blocks),len(city_blocks[0])):
+        new_heat = heat + city_blocks[new_y][new_x]
+        block = [new_heat,steps+1,(new_y,new_x),(dy,dx)]
+        heapq.heappush(pq, block)
+
+    if steps > 3 or steps == 0:
+      for (new_dy,new_dx) in [(-dx,dy),(dx,-dy)]:
+        (new_y,new_x) = (y+new_dy,x+new_dx)
+        if _in_range(new_y,new_x,len(city_blocks),len(city_blocks[0])):
+          new_heat = heat + city_blocks[new_y][new_x]
+          block = [new_heat,1,(new_y,new_x),(new_dy,new_dx)]
           heapq.heappush(pq, block)
 
-  #print outs
-  print("---" * 10, " search complete")
-  # for row in pos_map:
-  #   print(*row)
-  # print_city = list(city_blocks)
-  # s = (12, 12)
-  # while s != (0, 0):
-  #   print(s)
-  #   print_city[s[0]][s[1]] = '*'
-  #   s = pos_map[s[0]][s[1]]
-  # print_city[s[0]][s[1]] = '*'
-
-  return heat_map
+  return -1
 
 
 # Part 1
 def _listOps1(city_blocks):
-  start = (0, 0)
-  # stop_y = len(city_blocks[0])-1
-  # stop_x = len(city_blocks)-1
-  # stop = (stop_y, stop_x)
+  heat = _shortestPath(city_blocks)
 
-  city_map = _shortestPath(city_blocks, start)
-
-  print(">" * 10, "Heat Map", "<" * 10)
-  for row in city_map:
-    print(*row)
-  for row in city_blocks:
-    print(*row)
-
-  return 1
+  return heat
 
 
 # Part 2
-def _listOps2(alist):
-  total = sum(1 for _ in alist)
+def _listOps2(city_blocks):
+  heat = _shortestPathUltra(city_blocks)
 
-  return total
+  return heat
 
 
 if __name__ == "__main__":
   func = _stringParsing
   parsed_input = parseWithFunction(func)
-  for row in parsed_input:
-    print(*row)
+  # for row in parsed_input:
+  #   print(*row)
   print("Part 1: ", _listOps1(parsed_input))
   print("Part 2: ", _listOps2(parsed_input))
 
-import heapq
-
-# # Try heapq!!
-# my_objects = [
-#     [(1, 2), (0, 1), 3],
-#     [(2, 3), (1, 0), 2],
-#     [(0, 1), (1, 0), 5],
-#     # ... add more objects as needed
-# ]
-
-# # Custom key function to use the last item (distance) for comparison
-# key_function = lambda obj: obj[-1]
-
-# # Convert the list to a heap using the custom key
-# heapq.heapify(my_objects)
-
-# # Push a new object onto the heap using the key function
-# new_object = [(3, 4), (0, 1), 4]
-# heapq.heappush(my_objects, new_object, key=key_function)
-
-# # Popping the smallest object based on distance
-# smallest_object = heapq.heappop(my_objects, key=key_function)
-
-# print("Original heap of objects:", my_objects)
-# print("Smallest object popped:", smallest_object)
