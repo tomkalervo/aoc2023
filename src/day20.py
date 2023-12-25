@@ -1,4 +1,4 @@
-import re,sys
+import re,sys,math
 from collections import deque
 from myModules.inputParser import parseWithFunction  #type: ignore
 
@@ -73,6 +73,19 @@ def _pressButton(network,state):
             signals.append((destination,module,1))
   
   return high,low,state
+
+def _get_default_state(network):
+  state = {}
+  for key in network:
+    mod,_ = network[key]
+    if mod == '%':
+      state.update({key:0})
+    elif mod == '&':
+      modules = list(
+        filter(None, [k if key in ms else None for k in network for ms in network[k]]))
+      state.update({key:{m:0 for m in modules}})
+  return state
+
 # Part 1
 def _listOps1(network):
   # button is pressed 1000 times
@@ -81,55 +94,70 @@ def _listOps1(network):
   button = 1000
   high_pulses = 0
   low_pulses = 0
-  state = {}
-  for key in network:
-    mod,_ = network[key]
-    if mod == '%':
-      state.update({key:0})
-    elif mod == '&':
-      modules = list(
-        filter(None, [k if key in ms else None for k in network for ms in network[k]]))
-      state.update({key:{m:0 for m in modules}})
-
-  store = {}
-  state_key = _convert_to_frozenset(state)
+  state = _get_default_state(network)
 
   while button > 0:
     button -= 1
-    if state_key in store:
-      cycle = 1
-      h, l, next_state_key = store[state_key]
-      high = [h]
-      low = [l]
-      while state_key != next_state_key:
-        cycle += 1
-        h, l, next_state_key = store[state_key]
-        high.append(h)
-        low.append(l)
-      high_pulses += sum(high)
-      low_pulses += sum(low)
-      while cycle <= button:
-        button -= cycle
-        high_pulses += sum(high)
-        low_pulses += sum(low)
-      i = 0
-      while button > 0:
-        button -= 1
-        high_pulses += high[i]
-        low_pulses += low[i]
-        i += 1 % cycle
-
-    else:
-      next_state = state.copy()
-      high, low, next_state = _pressButton(network,next_state)
-      next_state_key = _convert_to_frozenset(next_state)
-      store.update({state_key : (high,low,next_state_key)})
-      state = next_state
-      state_key = next_state_key
-      high_pulses += high
-      low_pulses += low
+    high, low, state = _pressButton(network,state)
+    high_pulses += high
+    low_pulses += low
       
   return high_pulses * low_pulses
+  
+def _minClick(incoming,network,relations):
+  module, pulse, x = incoming
+  operand,_ = network[module]
+  #basecase
+  match operand: 
+    case 'b':
+      if pulse == 'low':
+        return x
+      else:
+        return None
+    case '%':
+      values = []
+      for input_module in relations[module]:
+        value = _minClick((input_module,'low',x),network,relations)
+        if value != None:
+          values.append(value)
+      values.sort()
+      if not values:
+        return None
+      elif pulse == 'low':
+        if values > 1:
+          return min(values[0]+values[1], 2*values[0])
+        else:
+          return 2*values[0]
+      else:
+        return min(values)
+      
+    case '&':
+      #This logic needs to handle the distance to the broadcaster ?
+      if pulse == 'low':
+        values = [_minClick((inpt,'high',1),network,relations) for inpt in relations[module]]
+        if None in values:
+          return None
+        else:
+          return x * math.lcm(*values)
+      else:
+        values = []
+        for input_module in relations[module]:
+          value = _minClick((input_module,pulse,x),network,relations)
+          if value != None:
+            values.append(value)
+
+        values.sort()
+        if not values:
+          return None
+        else:
+          v = 0
+          while x > 0:
+            x -= 1
+            v += values[0]
+            values[0] *= 2
+            values.sort()
+          return v
+  
   
 def _listOps2(network):
   # button is pressed 1000 times
@@ -138,49 +166,30 @@ def _listOps2(network):
   button = 0
   high_pulses = 0
   low_pulses = 0
-  state = {}
-  for key in network:
-    mod,_ = network[key]
-    if mod == '%':
-      state.update({key:0})
-    elif mod == '&':
-      modules = list(
-        filter(None, [k if key in ms else None for k in network for ms in network[k]]))
-      state.update({key:{m:0 for m in modules}})
+  relations = {}
+  for key in network: 
+    # mod,_ = network[key]
+    modules = list(
+      filter(None, [k if key in ms else None for k in network for ms in network[k]]))
+    relations.update({key:modules})
+  output_key = 'rx'
+  output_modules = []
+  for key in network: #get relations to output
+    _,modules = network[key]
+    # print(modules)
+    if output_key in modules:
+      output_modules.append(key)
+  relations.update({output_key:output_modules})
+  print(network)
   print("-"*20)
-  rx = []
-  m = 'rx'
-  p = 0
-  while len(rx) == 0:
-    for key in network:
-      op,modules = network[key]
-      if m in modules:
-        print(f"{key} : {modules} -> {key} states : {state[key]}")
-        if op == '&':
-          p = (p + 1) % 2
-          rx.append(key)
-        elif op == '%':
-          p = (p + 1) % 2
-          m = key 
-          print("Flipflop module, ", m)
-        else:
-          pass
-  print(rx)
-  print(p)
-  rx_input_state = {}
+  print(relations)
 
-  while rx:
-    button += 1
-    _, _, state = _pressButton(network,state)
-    for m in rx:
-      if sum(x for _,x in state[m].items()) == len(state[m]):
-        rx_input_state.update({m:button})
-        print(f"{m} with state {state[m].items()}")
-        rx.remove(m)
-        # print(len(rx))  
+  p = 'low'
+  for ms in relations[output_key]:
+    print(f"min from {ms}: {_minClick((ms,p,1),network,relations)}")
 
-  print(rx)
-  print(rx_input_state)
+  # _, _, state = _pressButton(network,_get_default_state(network))
+  # print(state)
   return 1
 
 
